@@ -5,18 +5,14 @@ export interface Caucion {
   tna: number;
   plazo: number;
   fechaInicio: string;
+  renovaciones: number;
 }
 
 export interface Cedear {
   id: string;
   ticker: string;
   cantidad: number;
-  precioARS: number;
-  precioUSD: number;
+  precioCompra: number;
+  precioActual: number;
   caucionId?: string;
-}
-
-export interface AppConfig {
-  ccl: number;
-  mep: number;
 }
