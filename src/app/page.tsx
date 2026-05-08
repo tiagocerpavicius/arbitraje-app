@@ -35,26 +35,16 @@ function AppContent({ userId, userEmail, signOut }: { userId: string; userEmail:
             <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '16px', color: 'var(--text)', letterSpacing: '0.04em' }}>
               ARB<span style={{ color: 'var(--violet)' }}>/</span>TC
             </div>
-            <div style={{ fontSize: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--muted)', letterSpacing: '0.08em' }}>CAUCIONES · CEDEARs</div>
+            <div style={{ fontSize: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--muted)', letterSpacing: '0.08em' }}>CAUCIONES · CEDEARs · USD MEP</div>
           </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {([{ label: 'CCL', key: 'ccl' as const }, { label: 'MEP', key: 'mep' as const }]).map(({ label, key }) => (
-              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '10px', fontFamily: 'Syne, sans-serif', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--muted2)' }}>{label}</span>
-                <input type="number" value={store.config[key]} onChange={(e) => store.updateConfig({ [key]: Number(e.target.value) })}
-                  style={{ width: '90px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', color: 'var(--amber)', fontFamily: 'DM Mono, monospace', fontSize: '13px', textAlign: 'right' }} />
-              </div>
-            ))}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingLeft: '16px', borderLeft: '1px solid var(--border)' }}>
-              <span style={{ fontSize: '11px', color: 'var(--muted2)', fontFamily: 'DM Mono, monospace', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userEmail}</span>
-              <button onClick={signOut} title="Cerrar sesión"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '4px', display: 'flex', alignItems: 'center' }}
-                onMouseOver={(e) => (e.currentTarget.style.color = 'var(--red)')}
-                onMouseOut={(e) => (e.currentTarget.style.color = 'var(--muted)')}>
-                <LogOut size={15} />
-              </button>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '11px', color: 'var(--muted2)', fontFamily: 'DM Mono, monospace', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userEmail}</span>
+            <button onClick={signOut} title="Cerrar sesión"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '4px', display: 'flex', alignItems: 'center' }}
+              onMouseOver={(e) => (e.currentTarget.style.color = 'var(--red)')}
+              onMouseOut={(e) => (e.currentTarget.style.color = 'var(--muted)')}>
+              <LogOut size={15} />
+            </button>
           </div>
         </div>
 
@@ -72,9 +62,9 @@ function AppContent({ userId, userEmail, signOut }: { userId: string; userEmail:
       </header>
 
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '28px 20px' }}>
-        {activeTab === 'resumen' && <ResumenTab cauciones={store.cauciones} cedears={store.cedears} config={store.config} />}
-        {activeTab === 'cauciones' && <CaucionesTab cauciones={store.cauciones} addCaucion={store.addCaucion} deleteCaucion={store.deleteCaucion} />}
-        {activeTab === 'cedears' && <CedearsTab cedears={store.cedears} cauciones={store.cauciones} config={store.config} addCedear={store.addCedear} updateCedear={store.updateCedear} deleteCedear={store.deleteCedear} />}
+        {activeTab === 'resumen' && <ResumenTab cauciones={store.cauciones} cedears={store.cedears} />}
+        {activeTab === 'cauciones' && <CaucionesTab cauciones={store.cauciones} addCaucion={store.addCaucion} renovarCaucion={store.renovarCaucion} deleteCaucion={store.deleteCaucion} />}
+        {activeTab === 'cedears' && <CedearsTab cedears={store.cedears} cauciones={store.cauciones} addCedear={store.addCedear} updateCedear={store.updateCedear} deleteCedear={store.deleteCedear} />}
       </main>
     </div>
   );
