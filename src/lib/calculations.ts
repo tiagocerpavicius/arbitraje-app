@@ -12,28 +12,29 @@ export function calcDiasRestantes(fechaInicio: string, plazo: number): number {
   return Math.ceil((venc.getTime() - hoy.getTime()) / 86400000);
 }
 
-export function calcInteres(monto: number, tna: number, plazo: number): number {
+export function calcInteresPeriodo(monto: number, tna: number, plazo: number): number {
   return monto * (tna / 100) * (plazo / 365);
 }
 
-export function calcTCImplicito(precioARS: number, precioUSD: number): number {
-  return precioUSD > 0 ? precioARS / precioUSD : 0;
+export function calcInteresTotal(monto: number, tna: number, plazo: number, renovaciones: number): number {
+  return calcInteresPeriodo(monto, tna, plazo) * (renovaciones + 1);
 }
 
-export function calcSpread(tcImpl: number, ccl: number): number {
-  return tcImpl > 0 ? ((ccl / tcImpl) - 1) * 100 : 0;
+export function calcPnL(precioCompra: number, precioActual: number, cantidad: number): number {
+  return (precioActual - precioCompra) * cantidad;
 }
 
-export function calcCostoCaucionPct(tna: number, plazo: number): number {
-  return (tna / 100) * (plazo / 365) * 100;
+export function calcPnLPct(precioCompra: number, precioActual: number): number {
+  return precioCompra > 0 ? ((precioActual - precioCompra) / precioCompra) * 100 : 0;
 }
 
-export function calcArbitrajeNeto(spread: number, costo: number): number {
-  return spread - costo;
+export function calcValorActual(precioActual: number, cantidad: number): number {
+  return precioActual * cantidad;
 }
 
-export const fmtARS = (n: number): string =>
-  '$ ' + new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 }).format(n);
+export function calcValorInvertido(precioCompra: number, cantidad: number): number {
+  return precioCompra * cantidad;
+}
 
 export const fmtUSD = (n: number, dec = 2): string =>
   'U$S ' + new Intl.NumberFormat('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(n);
