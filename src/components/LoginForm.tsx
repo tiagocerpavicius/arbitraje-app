@@ -64,4 +64,20 @@ export default function LoginForm() {
             <label style={{ display: 'block', fontSize: '10px', color: 'var(--muted2)', marginBottom: '5px', fontFamily: 'Syne, sans-serif', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Email</label>
             <input className="input-dark" type="email" placeholder="tu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
-          <div
+          <div>
+            <label style={{ display: 'block', fontSize: '10px', color: 'var(--muted2)', marginBottom: '5px', fontFamily: 'Syne, sans-serif', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Contraseña</label>
+            <input className="input-dark" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
+
+          {error && <div style={{ background: 'rgba(244,63,94,0.08)', border: '1px solid rgba(244,63,94,0.25)', borderRadius: '6px', padding: '10px 12px', fontSize: '12px', color: 'var(--red)' }}>{error}</div>}
+          {success && <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: '6px', padding: '10px 12px', fontSize: '12px', color: 'var(--green)' }}>{success}</div>}
+
+          <button type="submit" disabled={loading}
+            style={{ background: loading ? 'var(--surface2)' : 'var(--violet)', color: '#fff', border: 'none', borderRadius: '8px', padding: '12px', fontSize: '13px', fontWeight: 700, fontFamily: 'Syne, sans-serif', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, marginTop: '4px', letterSpacing: '0.05em' }}>
+            {loading ? 'Cargando...' : mode === 'login' ? 'Entrar' : 'Crear cuenta'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
