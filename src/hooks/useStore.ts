@@ -27,7 +27,8 @@ function rowToCedear(r: any): Cedear {
     cantidad: r.cantidad,
     precioCompra: r.precio_compra,
     precioActual: r.precio_actual,
-    caucionId: r.caucion_id ?? undefined,
+    precioVenta: r.precio_venta ?? undefined,
+    fechaVenta: r.fecha_venta ?? undefined,
   };
 }
 
@@ -61,7 +62,7 @@ export function useStore(userId: string) {
   }, [userId]);
 
   const renovarCaucion = useCallback(async (id: string) => {
-    const caucion = (await supabase.from('cauciones').select('*').eq('id', id).single()).data;
+    const { data: caucion } = await supabase.from('cauciones').select('*').eq('id', id).single();
     if (!caucion) return;
     const nuevaFecha = new Date().toISOString().split('T')[0];
     const { data: row } = await supabase.from('cauciones').update({
@@ -73,17 +74,15 @@ export function useStore(userId: string) {
 
   const deleteCaucion = useCallback(async (id: string) => {
     await supabase.from('cauciones').delete().eq('id', id).eq('user_id', userId);
-    await supabase.from('cedears').update({ caucion_id: null }).eq('caucion_id', id).eq('user_id', userId);
     setCauciones((p) => p.filter((c) => c.id !== id));
-    setCedears((p) => p.map((c) => (c.caucionId === id ? { ...c, caucionId: undefined } : c)));
   }, [userId]);
 
   const addCedear = useCallback(async (data: Omit<Cedear, 'id'>) => {
     const id = genId();
     const { data: row } = await supabase.from('cedears').insert({
-      id, user_id: userId, ticker: data.ticker, cantidad: data.cantidad,
-      precio_compra: data.precioCompra, precio_actual: data.precioActual,
-      caucion_id: data.caucionId ?? null,
+      id, user_id: userId, ticker: data.ticker,
+      cantidad: data.cantidad, precio_compra: data.precioCompra,
+      precio_actual: data.precioActual,
     }).select().single();
     if (row) setCedears((p) => [...p, rowToCedear(row)]);
   }, [userId]);
@@ -91,7 +90,8 @@ export function useStore(userId: string) {
   const updateCedear = useCallback(async (id: string, data: Partial<Omit<Cedear, 'id'>>) => {
     const updates: Record<string, unknown> = {};
     if (data.precioActual !== undefined) updates.precio_actual = data.precioActual;
-    if (data.caucionId !== undefined) updates.caucion_id = data.caucionId;
+    if (data.precioVenta !== undefined) updates.precio_venta = data.precioVenta;
+    if (data.fechaVenta !== undefined) updates.fecha_venta = data.fechaVenta;
     if (data.cantidad !== undefined) updates.cantidad = data.cantidad;
     await supabase.from('cedears').update(updates).eq('id', id).eq('user_id', userId);
     setCedears((p) => p.map((c) => (c.id === id ? { ...c, ...data } : c)));
