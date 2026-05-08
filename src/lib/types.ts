@@ -14,5 +14,6 @@ export interface Cedear {
   cantidad: number;
   precioCompra: number;
   precioActual: number;
-  caucionId?: string;
+  precioVenta?: number;
+  fechaVenta?: string;
 }
