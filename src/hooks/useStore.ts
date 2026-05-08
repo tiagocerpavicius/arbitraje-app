@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { Caucion, Cedear } from '@/lib/types';
+import { Caucion, CaucionPeriodo, Cedear } from '@/lib/types';
+import { calcInteresPeriodo } from '@/lib/calculations';
 import { supabase } from '@/lib/supabase';
 
 const genId = (): string =>
@@ -20,6 +21,19 @@ function rowToCaucion(r: any): Caucion {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToPeriodo(r: any): CaucionPeriodo {
+  return {
+    id: r.id,
+    caucionId: r.caucion_id,
+    monto: r.monto,
+    tna: r.tna,
+    plazo: r.plazo,
+    fechaInicio: r.fecha_inicio,
+    intereses: r.intereses,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToCedear(r: any): Cedear {
   return {
     id: r.id,
@@ -34,17 +48,28 @@ function rowToCedear(r: any): Cedear {
 
 export function useStore(userId: string) {
   const [cauciones, setCauciones] = useState<Caucion[]>([]);
+  const [periodos, setPeriodos] = useState<Record<string, CaucionPeriodo[]>>({});
   const [cedears, setCedears] = useState<Cedear[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
     const load = async () => {
-      const [caucRes, cedRes] = await Promise.all([
+      const [caucRes, perRes, cedRes] = await Promise.all([
         supabase.from('cauciones').select('*').eq('user_id', userId).order('created_at'),
+        supabase.from('caucion_periodos').select('*').eq('user_id', userId).order('created_at'),
         supabase.from('cedears').select('*').eq('user_id', userId).order('created_at'),
       ]);
       if (caucRes.data) setCauciones(caucRes.data.map(rowToCaucion));
+      if (perRes.data) {
+        const grouped: Record<string, CaucionPeriodo[]> = {};
+        perRes.data.forEach((r) => {
+          const p = rowToPeriodo(r);
+          if (!grouped[p.caucionId]) grouped[p.caucionId] = [];
+          grouped[p.caucionId].push(p);
+        });
+        setPeriodos(grouped);
+      }
       if (cedRes.data) setCedears(cedRes.data.map(rowToCedear));
       setHydrated(true);
     };
@@ -61,20 +86,52 @@ export function useStore(userId: string) {
     if (row) setCauciones((p) => [...p, rowToCaucion(row)]);
   }, [userId]);
 
-  const renovarCaucion = useCallback(async (id: string) => {
-    const { data: caucion } = await supabase.from('cauciones').select('*').eq('id', id).single();
+  const renovarCaucion = useCallback(async (
+    id: string,
+    params: { monto: number; tna: number; plazo: number; fechaInicio: string }
+  ) => {
+    const caucion = cauciones.find((c) => c.id === id);
     if (!caucion) return;
-    const nuevaFecha = new Date().toISOString().split('T')[0];
+
+    // Guardar período actual en historial
+    const periodoId = genId();
+    const interesesPeriodo = calcInteresPeriodo(caucion.monto, caucion.tna, caucion.plazo);
+    await supabase.from('caucion_periodos').insert({
+      id: periodoId,
+      caucion_id: id,
+      user_id: userId,
+      monto: caucion.monto,
+      tna: caucion.tna,
+      plazo: caucion.plazo,
+      fecha_inicio: caucion.fechaInicio,
+      intereses: interesesPeriodo,
+    });
+
+    // Actualizar caución con nuevos términos
     const { data: row } = await supabase.from('cauciones').update({
+      monto: params.monto,
+      tna: params.tna,
+      plazo: params.plazo,
+      fecha_inicio: params.fechaInicio,
       renovaciones: caucion.renovaciones + 1,
-      fecha_inicio: nuevaFecha,
     }).eq('id', id).select().single();
-    if (row) setCauciones((p) => p.map((c) => (c.id === id ? rowToCaucion(row) : c)));
-  }, []);
+
+    if (row) {
+      setCauciones((p) => p.map((c) => (c.id === id ? rowToCaucion(row) : c)));
+      const nuevoPeriodo: CaucionPeriodo = {
+        id: periodoId, caucionId: id,
+        monto: caucion.monto, tna: caucion.tna,
+        plazo: caucion.plazo, fechaInicio: caucion.fechaInicio,
+        intereses: interesesPeriodo,
+      };
+      setPeriodos((p) => ({ ...p, [id]: [...(p[id] ?? []), nuevoPeriodo] }));
+    }
+  }, [userId, cauciones]);
 
   const deleteCaucion = useCallback(async (id: string) => {
     await supabase.from('cauciones').delete().eq('id', id).eq('user_id', userId);
     setCauciones((p) => p.filter((c) => c.id !== id));
+    setPeriodos((p) => { const next = { ...p }; delete next[id]; return next; });
   }, [userId]);
 
   const addCedear = useCallback(async (data: Omit<Cedear, 'id'>) => {
@@ -103,7 +160,7 @@ export function useStore(userId: string) {
   }, [userId]);
 
   return {
-    cauciones, cedears, hydrated,
+    cauciones, periodos, cedears, hydrated,
     addCaucion, renovarCaucion, deleteCaucion,
     addCedear, updateCedear, deleteCedear,
   };
