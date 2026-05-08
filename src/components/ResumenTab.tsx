@@ -1,9 +1,9 @@
 'use client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, Cell } from 'recharts';
-import { Caucion, Cedear, AppConfig } from '@/lib/types';
-import { calcTCImplicito, calcSpread, calcCostoCaucionPct, calcArbitrajeNeto, calcInteres, fmtARS, fmtUSD, fmtPct, fmtNum } from '@/lib/calculations';
+import { Caucion, Cedear } from '@/lib/types';
+import { calcInteresTotal, calcPnL, calcPnLPct, calcValorActual, calcValorInvertido, fmtUSD, fmtPct, fmtNum } from '@/lib/calculations';
 
-interface Props { cauciones: Caucion[]; cedears: Cedear[]; config: AppConfig; }
+interface Props { cauciones: Caucion[]; cedears: Cedear[]; }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const DarkTooltip = ({ active, payload, label }: any) => {
@@ -14,33 +14,40 @@ const DarkTooltip = ({ active, payload, label }: any) => {
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       {payload.map((p: any) => (
         <div key={p.dataKey} style={{ color: p.fill ?? p.color, marginBottom: '2px' }}>
-          {p.name}: {typeof p.value === 'number' && p.value >= 0 ? '+' : ''}{p.value}{p.unit ?? ''}
+          {p.name}: {typeof p.value === 'number' && p.value >= 0 ? '+' : ''}U$S {p.value}
         </div>
       ))}
     </div>
   );
 };
 
-export default function ResumenTab({ cauciones, cedears, config }: Props) {
-  const totalCauciones = cauciones.reduce((a, c) => a + c.monto, 0);
-  const totalInteres = cauciones.reduce((a, c) => a + calcInteres(c.monto, c.tna, c.plazo), 0);
-  const totalUSD = cedears.reduce((a, c) => a + c.cantidad * c.precioUSD, 0);
-  const avgSpread = cedears.length > 0 ? cedears.reduce((a, c) => a + calcSpread(calcTCImplicito(c.precioARS, c.precioUSD), config.ccl), 0) / cedears.length : 0;
+export default function ResumenTab({ cauciones, cedears }: Props) {
+  const totalInvertido = cedears.reduce((a, c) => a + calcValorInvertido(c.precioCompra, c.cantidad), 0);
+  const totalActual = cedears.reduce((a, c) => a + calcValorActual(c.precioActual, c.cantidad), 0);
+  const totalPnL = totalActual - totalInvertido;
+  const totalPnLPct = totalInvertido > 0 ? (totalPnL / totalInvertido) * 100 : 0;
+  const totalCostoCauciones = cauciones.reduce((a, c) => a + calcInteresTotal(c.monto, c.tna, c.plazo, c.renovaciones), 0);
+  const rendimientoNeto = totalPnL - totalCostoCauciones;
+  const rendimientoNetoPct = totalInvertido > 0 ? (rendimientoNeto / totalInvertido) * 100 : 0;
 
-  const tcData = cedears.map((c) => ({ name: c.ticker, tc: Math.round(calcTCImplicito(c.precioARS, c.precioUSD)) }));
-  const spreadData = cedears.map((c) => ({ name: c.ticker, spread: parseFloat(calcSpread(calcTCImplicito(c.precioARS, c.precioUSD), config.ccl).toFixed(2)) }));
-  const arbData = cedears.filter((c) => c.caucionId).map((c) => {
-    const caucion = cauciones.find((x) => x.id === c.caucionId);
-    if (!caucion) return null;
-    const spread = calcSpread(calcTCImplicito(c.precioARS, c.precioUSD), config.ccl);
-    const costo = calcCostoCaucionPct(caucion.tna, caucion.plazo);
-    return { name: c.ticker, spread: parseFloat(spread.toFixed(2)), costo: parseFloat((-costo).toFixed(2)), neto: parseFloat(calcArbitrajeNeto(spread, costo).toFixed(2)) };
-  }).filter(Boolean) as { name: string; spread: number; costo: number; neto: number }[];
+  const pnlData = cedears.map((c) => ({
+    name: c.ticker,
+    pnl: parseFloat(calcPnL(c.precioCompra, c.precioActual, c.cantidad).toFixed(2)),
+  }));
 
-  const card = (label: string, value: string, sub: string, valueColor: string) => (
+  const pctData = cedears.map((c) => ({
+    name: c.ticker,
+    pct: parseFloat(calcPnLPct(c.precioCompra, c.precioActual).toFixed(2)),
+  }));
+
+  const avgCostoPct = cauciones.length > 0
+    ? cauciones.reduce((a, c) => a + (c.tna / 100) * (c.plazo / 365) * 100, 0) / cauciones.length
+    : 0;
+
+  const card = (label: string, value: string, sub: string, color: string) => (
     <div key={label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '18px' }}>
       <div style={{ fontSize: '10px', fontFamily: 'Syne, sans-serif', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--muted2)', marginBottom: '8px' }}>{label}</div>
-      <div className="font-mono-data" style={{ fontSize: '22px', fontWeight: 500, color: valueColor, marginBottom: '4px' }}>{value}</div>
+      <div className="font-mono-data" style={{ fontSize: '22px', fontWeight: 500, color, marginBottom: '4px' }}>{value}</div>
       <div style={{ fontSize: '11px', color: 'var(--muted2)' }}>{sub}</div>
     </div>
   );
@@ -54,16 +61,16 @@ export default function ResumenTab({ cauciones, cedears, config }: Props) {
   );
 
   const xAxis = <XAxis dataKey="name" tick={{ fill: '#6b6b9a', fontSize: 11, fontFamily: 'DM Mono, monospace' }} axisLine={false} tickLine={false} />;
-  const yAxis = (fmt?: (v: number) => string) => <YAxis tick={{ fill: '#6b6b9a', fontSize: 11, fontFamily: 'DM Mono, monospace' }} axisLine={false} tickLine={false} tickFormatter={fmt} domain={['auto', 'auto']} />;
   const grid = <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
-        {card('Total en Cauciones', fmtARS(totalCauciones), `Interés: ${fmtARS(totalInteres)}`, 'var(--amber)')}
-        {card('Total CEDEARs (D)', fmtUSD(totalUSD), `${cedears.length} posiciones`, 'var(--amber)')}
-        {card('Spread Prom. vs CCL', cedears.length > 0 ? fmtPct(avgSpread) : '—', `CCL ref: ${fmtNum(config.ccl, 0)}`, avgSpread >= 0 ? 'var(--green)' : 'var(--red)')}
-        {card('Dólar MEP ref.', fmtNum(config.mep, 0), `CCL: ${fmtNum(config.ccl, 0)}`, 'var(--text)')}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '12px' }}>
+        {card('Capital invertido', fmtUSD(totalInvertido), `${cedears.length} posiciones`, 'var(--text)')}
+        {card('Valor actual CEDEARs', fmtUSD(totalActual), `vs ${fmtUSD(totalInvertido)} invertido`, 'var(--amber)')}
+        {card('P&L CEDEARs', fmtUSD(totalPnL), fmtPct(totalPnLPct), totalPnL >= 0 ? 'var(--green)' : 'var(--red)')}
+        {card('Costo cauciones', fmtUSD(totalCostoCauciones), `${cauciones.length} cauciones activas`, 'var(--red)')}
+        {card('Rendimiento neto', fmtUSD(rendimientoNeto), fmtPct(rendimientoNetoPct), rendimientoNeto >= 0 ? 'var(--green)' : 'var(--red)')}
       </div>
 
       {cedears.length === 0 && cauciones.length === 0 && (
@@ -76,40 +83,30 @@ export default function ResumenTab({ cauciones, cedears, config }: Props) {
 
       {cedears.length > 0 && (
         <>
-          {chartBox('TC Implícito por CEDEAR vs CCL', 'Verde = TC implícito menor al CCL → el CEDEAR está barato en pesos → oportunidad de comprar en $ y vender en D.',
+          {chartBox('P&L por CEDEAR (USD)', 'Ganancia o pérdida en dólares por posición.',
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={tcData} margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
-                {grid}{xAxis}{yAxis()}
+              <BarChart data={pnlData} margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
+                {grid}{xAxis}
+                <YAxis tick={{ fill: '#6b6b9a', fontSize: 11, fontFamily: 'DM Mono, monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}`} domain={['auto', 'auto']} />
                 <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                <ReferenceLine y={config.ccl} stroke="#f43f5e" strokeDasharray="5 3" label={{ value: `CCL ${fmtNum(config.ccl, 0)}`, fill: '#f43f5e', fontSize: 10, fontFamily: 'DM Mono, monospace', position: 'insideTopRight' }} />
-                <Bar dataKey="tc" name="TC Impl." radius={[4, 4, 0, 0]}>
-                  {tcData.map((e, i) => <Cell key={i} fill={e.tc < config.ccl ? '#10b981' : '#f59e0b'} />)}
+                <ReferenceLine y={0} stroke="rgba(255,255,255,0.1)" />
+                <Bar dataKey="pnl" name="P&L" radius={[4, 4, 0, 0]}>
+                  {pnlData.map((e, i) => <Cell key={i} fill={e.pnl >= 0 ? '#10b981' : '#f43f5e'} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           )}
-          {chartBox('Spread vs CCL por CEDEAR (%)', 'Spread positivo (verde) = comprás dólares más barato que el CCL.',
+
+          {chartBox('Rendimiento % por CEDEAR vs costo caución', 'Línea roja = costo promedio de tus cauciones activas. Barras sobre la línea = rendimiento positivo neto.',
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={spreadData} margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
-                {grid}{xAxis}{yAxis((v) => `${v}%`)}
+              <BarChart data={pctData} margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
+                {grid}{xAxis}
+                <YAxis tick={{ fill: '#6b6b9a', fontSize: 11, fontFamily: 'DM Mono, monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} domain={['auto', 'auto']} />
                 <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
                 <ReferenceLine y={0} stroke="rgba(255,255,255,0.1)" />
-                <Bar dataKey="spread" name="Spread" radius={[4, 4, 0, 0]} unit="%">
-                  {spreadData.map((e, i) => <Cell key={i} fill={e.spread >= 0 ? '#10b981' : '#f43f5e'} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-          {arbData.length > 0 && chartBox('Arbitraje Neto (%)', 'Spread del CEDEAR menos costo de la caución vinculada.',
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={arbData} margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
-                {grid}{xAxis}{yAxis((v) => `${v}%`)}
-                <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                <ReferenceLine y={0} stroke="rgba(255,255,255,0.1)" />
-                <Bar dataKey="spread" name="Spread CEDEAR" fill="#8b5cf6" radius={[4, 4, 0, 0]} unit="%" />
-                <Bar dataKey="costo" name="Costo caución" fill="#f43f5e" radius={[4, 4, 0, 0]} unit="%" />
-                <Bar dataKey="neto" name="Neto" radius={[4, 4, 0, 0]} unit="%">
-                  {arbData.map((e, i) => <Cell key={i} fill={e.neto >= 0 ? '#10b981' : '#f43f5e'} />)}
+                {avgCostoPct > 0 && <ReferenceLine y={avgCostoPct} stroke="#f43f5e" strokeDasharray="5 3" label={{ value: `Costo cauciones ${fmtNum(avgCostoPct)}%`, fill: '#f43f5e', fontSize: 10, position: 'insideTopRight' }} />}
+                <Bar dataKey="pct" name="Rend." radius={[4, 4, 0, 0]} unit="%">
+                  {pctData.map((e, i) => <Cell key={i} fill={e.pct >= avgCostoPct ? '#10b981' : '#f43f5e'} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
