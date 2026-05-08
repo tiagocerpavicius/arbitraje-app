@@ -35,10 +35,14 @@ function AppContent({ userId, userEmail, signOut }: { userId: string; userEmail:
             <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '16px', color: 'var(--text)', letterSpacing: '0.04em' }}>
               ARB<span style={{ color: 'var(--violet)' }}>/</span>TC
             </div>
-            <div style={{ fontSize: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--muted)', letterSpacing: '0.08em' }}>CAUCIONES · CEDEARs · USD MEP</div>
+            <div style={{ fontSize: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--muted)', letterSpacing: '0.08em' }}>
+              CAUCIONES · CEDEARs · USD MEP
+            </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '11px', color: 'var(--muted2)', fontFamily: 'DM Mono, monospace', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userEmail}</span>
+            <span style={{ fontSize: '11px', color: 'var(--muted2)', fontFamily: 'DM Mono, monospace', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {userEmail}
+            </span>
             <button onClick={signOut} title="Cerrar sesión"
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '4px', display: 'flex', alignItems: 'center' }}
               onMouseOver={(e) => (e.currentTarget.style.color = 'var(--red)')}
@@ -47,7 +51,6 @@ function AppContent({ userId, userEmail, signOut }: { userId: string; userEmail:
             </button>
           </div>
         </div>
-
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px', display: 'flex', borderTop: '1px solid var(--border)' }}>
           {TABS.map((tab) => {
             const active = activeTab === tab.id;
@@ -62,9 +65,25 @@ function AppContent({ userId, userEmail, signOut }: { userId: string; userEmail:
       </header>
 
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '28px 20px' }}>
-        {activeTab === 'resumen' && <ResumenTab cauciones={store.cauciones} cedears={store.cedears} />}
-        {activeTab === 'cauciones' && <CaucionesTab cauciones={store.cauciones} addCaucion={store.addCaucion} renovarCaucion={store.renovarCaucion} deleteCaucion={store.deleteCaucion} />}
-        {activeTab === 'cedears' && <CedearsTab cedears={store.cedears} cauciones={store.cauciones} addCedear={store.addCedear} updateCedear={store.updateCedear} deleteCedear={store.deleteCedear} />}
+        {activeTab === 'resumen' && (
+          <ResumenTab cauciones={store.cauciones} cedears={store.cedears} />
+        )}
+        {activeTab === 'cauciones' && (
+          <CaucionesTab
+            cauciones={store.cauciones}
+            addCaucion={store.addCaucion}
+            renovarCaucion={store.renovarCaucion}
+            deleteCaucion={store.deleteCaucion}
+          />
+        )}
+        {activeTab === 'cedears' && (
+          <CedearsTab
+            cedears={store.cedears}
+            addCedear={store.addCedear}
+            updateCedear={store.updateCedear}
+            deleteCedear={store.deleteCedear}
+          />
+        )}
       </main>
     </div>
   );
