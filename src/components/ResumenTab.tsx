@@ -1,7 +1,14 @@
 'use client';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, Cell } from 'recharts';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ReferenceLine, ResponsiveContainer, Cell,
+} from 'recharts';
 import { Caucion, Cedear } from '@/lib/types';
-import { calcInteresTotal, calcPnL, calcPnLPct, calcValorActual, calcValorInvertido, fmtUSD, fmtPct, fmtNum } from '@/lib/calculations';
+import {
+  calcInteresTotal, calcPnL, calcPnLPct,
+  calcValorActual, calcValorInvertido,
+  fmtUSD, fmtPct,
+} from '@/lib/calculations';
 
 interface Props { cauciones: Caucion[]; cedears: Cedear[]; }
 
@@ -22,32 +29,36 @@ const DarkTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function ResumenTab({ cauciones, cedears }: Props) {
-  const totalInvertido = cedears.reduce((a, c) => a + calcValorInvertido(c.precioCompra, c.cantidad), 0);
-  const totalActual = cedears.reduce((a, c) => a + calcValorActual(c.precioActual, c.cantidad), 0);
-  const totalPnL = totalActual - totalInvertido;
-  const totalPnLPct = totalInvertido > 0 ? (totalPnL / totalInvertido) * 100 : 0;
+  const abiertas = cedears.filter((c) => !c.precioVenta);
+  const cerradas = cedears.filter((c) => c.precioVenta !== undefined);
+
+  const totalInvertido = abiertas.reduce((a, c) => a + calcValorInvertido(c.precioCompra, c.cantidad), 0);
+  const totalActual = abiertas.reduce((a, c) => a + calcValorActual(c.precioActual, c.cantidad), 0);
+  const pnlNoRealizado = totalActual - totalInvertido;
+  const pnlRealizado = cerradas.reduce((a, c) => a + calcPnL(c.precioCompra, c.precioVenta!, c.cantidad), 0);
+  const pnlTotal = pnlNoRealizado + pnlRealizado;
   const totalCostoCauciones = cauciones.reduce((a, c) => a + calcInteresTotal(c.monto, c.tna, c.plazo, c.renovaciones), 0);
-  const rendimientoNeto = totalPnL - totalCostoCauciones;
+  const rendimientoNeto = pnlTotal - totalCostoCauciones;
   const rendimientoNetoPct = totalInvertido > 0 ? (rendimientoNeto / totalInvertido) * 100 : 0;
 
-  const pnlData = cedears.map((c) => ({
+  // Gráfico 1: P&L individual por CEDEAR (solo abiertas)
+  const pnlData = abiertas.map((c) => ({
     name: c.ticker,
-    pnl: parseFloat(calcPnL(c.precioCompra, c.precioActual, c.cantidad).toFixed(2)),
-  }));
-
-  const pctData = cedears.map((c) => ({
-    name: c.ticker,
+    valor: parseFloat(calcPnL(c.precioCompra, c.precioActual, c.cantidad).toFixed(2)),
     pct: parseFloat(calcPnLPct(c.precioCompra, c.precioActual).toFixed(2)),
   }));
 
-  const avgCostoPct = cauciones.length > 0
-    ? cauciones.reduce((a, c) => a + (c.tna / 100) * (c.plazo / 365) * 100, 0) / cauciones.length
-    : 0;
+  // Gráfico 2: Comparación cartera total
+  const totalData = [
+    { name: 'P&L CEDEARs', valor: parseFloat(pnlTotal.toFixed(2)), color: pnlTotal >= 0 ? '#10b981' : '#f43f5e' },
+    { name: 'Costo cauciones', valor: parseFloat((-totalCostoCauciones).toFixed(2)), color: '#f43f5e' },
+    { name: 'Rend. neto', valor: parseFloat(rendimientoNeto.toFixed(2)), color: rendimientoNeto >= 0 ? '#10b981' : '#f43f5e' },
+  ];
 
   const card = (label: string, value: string, sub: string, color: string) => (
     <div key={label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '18px' }}>
       <div style={{ fontSize: '10px', fontFamily: 'Syne, sans-serif', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--muted2)', marginBottom: '8px' }}>{label}</div>
-      <div className="font-mono-data" style={{ fontSize: '22px', fontWeight: 500, color, marginBottom: '4px' }}>{value}</div>
+      <div className="font-mono-data" style={{ fontSize: '20px', fontWeight: 500, color, marginBottom: '4px' }}>{value}</div>
       <div style={{ fontSize: '11px', color: 'var(--muted2)' }}>{sub}</div>
     </div>
   );
@@ -61,14 +72,18 @@ export default function ResumenTab({ cauciones, cedears }: Props) {
   );
 
   const xAxis = <XAxis dataKey="name" tick={{ fill: '#6b6b9a', fontSize: 11, fontFamily: 'DM Mono, monospace' }} axisLine={false} tickLine={false} />;
+  const yAxis = <YAxis tick={{ fill: '#6b6b9a', fontSize: 11, fontFamily: 'DM Mono, monospace' }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />;
   const grid = <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />;
+  const cursor = { fill: 'rgba(255,255,255,0.04)' };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '12px' }}>
-        {card('Capital invertido', fmtUSD(totalInvertido), `${cedears.length} posiciones`, 'var(--text)')}
-        {card('Valor actual CEDEARs', fmtUSD(totalActual), `vs ${fmtUSD(totalInvertido)} invertido`, 'var(--amber)')}
-        {card('P&L CEDEARs', fmtUSD(totalPnL), fmtPct(totalPnLPct), totalPnL >= 0 ? 'var(--green)' : 'var(--red)')}
+
+      {/* Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
+        {card('P&L no realizado', fmtUSD(pnlNoRealizado), `${abiertas.length} posiciones abiertas`, pnlNoRealizado >= 0 ? 'var(--green)' : 'var(--red)')}
+        {card('P&L realizado', fmtUSD(pnlRealizado), `${cerradas.length} posiciones cerradas`, pnlRealizado >= 0 ? 'var(--green)' : 'var(--red)')}
+        {card('P&L total', fmtUSD(pnlTotal), fmtPct(totalInvertido > 0 ? (pnlTotal / totalInvertido) * 100 : 0), pnlTotal >= 0 ? 'var(--green)' : 'var(--red)')}
         {card('Costo cauciones', fmtUSD(totalCostoCauciones), `${cauciones.length} cauciones activas`, 'var(--red)')}
         {card('Rendimiento neto', fmtUSD(rendimientoNeto), fmtPct(rendimientoNetoPct), rendimientoNeto >= 0 ? 'var(--green)' : 'var(--red)')}
       </div>
@@ -81,32 +96,35 @@ export default function ResumenTab({ cauciones, cedears }: Props) {
         </div>
       )}
 
-      {cedears.length > 0 && (
+      {abiertas.length > 0 && (
         <>
-          {chartBox('P&L por CEDEAR (USD)', 'Ganancia o pérdida en dólares por posición.',
+          {/* Gráfico 1: P&L individual */}
+          {chartBox(
+            'P&L por CEDEAR (USD)',
+            'Ganancia o pérdida de cada posición abierta en dólares, independientemente del costo de financiamiento.',
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={pnlData} margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
-                {grid}{xAxis}
-                <YAxis tick={{ fill: '#6b6b9a', fontSize: 11, fontFamily: 'DM Mono, monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}`} domain={['auto', 'auto']} />
-                <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                {grid}{xAxis}{yAxis}
+                <Tooltip content={<DarkTooltip />} cursor={cursor} />
                 <ReferenceLine y={0} stroke="rgba(255,255,255,0.1)" />
-                <Bar dataKey="pnl" name="P&L" radius={[4, 4, 0, 0]}>
-                  {pnlData.map((e, i) => <Cell key={i} fill={e.pnl >= 0 ? '#10b981' : '#f43f5e'} />)}
+                <Bar dataKey="valor" name="P&L" radius={[4, 4, 0, 0]}>
+                  {pnlData.map((e, i) => <Cell key={i} fill={e.valor >= 0 ? '#10b981' : '#f43f5e'} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           )}
 
-          {chartBox('Rendimiento % por CEDEAR vs costo caución', 'Línea roja = costo promedio de tus cauciones activas. Barras sobre la línea = rendimiento positivo neto.',
+          {/* Gráfico 2: Comparación total cartera */}
+          {chartBox(
+            'Resultado total de la estrategia (USD)',
+            'P&L total de CEDEARs vs costo total de cauciones. La barra "Rend. neto" es lo que efectivamente ganás.',
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={pctData} margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
-                {grid}{xAxis}
-                <YAxis tick={{ fill: '#6b6b9a', fontSize: 11, fontFamily: 'DM Mono, monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} domain={['auto', 'auto']} />
-                <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                <ReferenceLine y={0} stroke="rgba(255,255,255,0.1)" />
-                {avgCostoPct > 0 && <ReferenceLine y={avgCostoPct} stroke="#f43f5e" strokeDasharray="5 3" label={{ value: `Costo cauciones ${fmtNum(avgCostoPct)}%`, fill: '#f43f5e', fontSize: 10, position: 'insideTopRight' }} />}
-                <Bar dataKey="pct" name="Rend." radius={[4, 4, 0, 0]} unit="%">
-                  {pctData.map((e, i) => <Cell key={i} fill={e.pct >= avgCostoPct ? '#10b981' : '#f43f5e'} />)}
+              <BarChart data={totalData} margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
+                {grid}{xAxis}{yAxis}
+                <Tooltip content={<DarkTooltip />} cursor={cursor} />
+                <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" />
+                <Bar dataKey="valor" name="USD" radius={[4, 4, 0, 0]}>
+                  {totalData.map((e, i) => <Cell key={i} fill={e.color} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
