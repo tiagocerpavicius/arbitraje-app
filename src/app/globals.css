@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; }
+
+:root {
+  --bg: #07070f;
+  --surface: #0d0d1c;
+  --surface2: #12122a;
+  --border: #1c1c38;
+  --border2: #252550;
+  --text: #e2e8f0;
+  --muted: #4a4a7a;
+  --muted2: #6b6b9a;
+  --amber: #f59e0b;
+  --violet: #8b5cf6;
+  --green: #10b981;
+  --red: #f43f5e;
+}
+
+html, body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+}
+
+body {
+  background-image:
+    linear-gradient(rgba(139, 92, 246, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.font-mono-data { font-family: 'DM Mono', monospace; }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+.input-dark {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: var(--text);
+  font-size: 0.875rem;
+  width: 100%;
+  transition: border-color 0.15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.input-dark:focus { outline: none; border-color: var(--violet); }
+.input-dark::placeholder { color: var(--muted); }
+input[type='date']::-webkit-calendar-picker-indicator { filter: invert(0.5); }
