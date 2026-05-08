@@ -8,6 +8,16 @@ export interface Caucion {
   renovaciones: number;
 }
 
+export interface CaucionPeriodo {
+  id: string;
+  caucionId: string;
+  monto: number;
+  tna: number;
+  plazo: number;
+  fechaInicio: string;
+  intereses: number;
+}
+
 export interface Cedear {
   id: string;
   ticker: string;
