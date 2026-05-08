@@ -66,11 +66,16 @@ function AppContent({ userId, userEmail, signOut }: { userId: string; userEmail:
 
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '28px 20px' }}>
         {activeTab === 'resumen' && (
-          <ResumenTab cauciones={store.cauciones} cedears={store.cedears} />
+          <ResumenTab
+            cauciones={store.cauciones}
+            periodos={store.periodos}
+            cedears={store.cedears}
+          />
         )}
         {activeTab === 'cauciones' && (
           <CaucionesTab
             cauciones={store.cauciones}
+            periodos={store.periodos}
             addCaucion={store.addCaucion}
             renovarCaucion={store.renovarCaucion}
             deleteCaucion={store.deleteCaucion}
