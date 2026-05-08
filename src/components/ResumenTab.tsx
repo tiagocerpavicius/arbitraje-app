@@ -3,14 +3,18 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ReferenceLine, ResponsiveContainer, Cell,
 } from 'recharts';
-import { Caucion, Cedear } from '@/lib/types';
+import { Caucion, CaucionPeriodo, Cedear } from '@/lib/types';
 import {
-  calcInteresTotal, calcPnL, calcPnLPct,
+  calcInteresPeriodo, calcPnL, calcPnLPct,
   calcValorActual, calcValorInvertido,
   fmtUSD, fmtPct,
 } from '@/lib/calculations';
 
-interface Props { cauciones: Caucion[]; cedears: Cedear[]; }
+interface Props {
+  cauciones: Caucion[];
+  periodos: Record<string, CaucionPeriodo[]>;
+  cedears: Cedear[];
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const DarkTooltip = ({ active, payload, label }: any) => {
@@ -28,7 +32,7 @@ const DarkTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-export default function ResumenTab({ cauciones, cedears }: Props) {
+export default function ResumenTab({ cauciones, periodos, cedears }: Props) {
   const abiertas = cedears.filter((c) => !c.precioVenta);
   const cerradas = cedears.filter((c) => c.precioVenta !== undefined);
 
@@ -37,18 +41,20 @@ export default function ResumenTab({ cauciones, cedears }: Props) {
   const pnlNoRealizado = totalActual - totalInvertido;
   const pnlRealizado = cerradas.reduce((a, c) => a + calcPnL(c.precioCompra, c.precioVenta!, c.cantidad), 0);
   const pnlTotal = pnlNoRealizado + pnlRealizado;
-  const totalCostoCauciones = cauciones.reduce((a, c) => a + calcInteresTotal(c.monto, c.tna, c.plazo, c.renovaciones), 0);
+
+  const totalCostoCauciones = cauciones.reduce((total, c) => {
+    const historico = (periodos[c.id] ?? []).reduce((a, p) => a + p.intereses, 0);
+    return total + historico + calcInteresPeriodo(c.monto, c.tna, c.plazo);
+  }, 0);
+
   const rendimientoNeto = pnlTotal - totalCostoCauciones;
   const rendimientoNetoPct = totalInvertido > 0 ? (rendimientoNeto / totalInvertido) * 100 : 0;
 
-  // Gráfico 1: P&L individual por CEDEAR (solo abiertas)
   const pnlData = abiertas.map((c) => ({
     name: c.ticker,
     valor: parseFloat(calcPnL(c.precioCompra, c.precioActual, c.cantidad).toFixed(2)),
-    pct: parseFloat(calcPnLPct(c.precioCompra, c.precioActual).toFixed(2)),
   }));
 
-  // Gráfico 2: Comparación cartera total
   const totalData = [
     { name: 'P&L CEDEARs', valor: parseFloat(pnlTotal.toFixed(2)), color: pnlTotal >= 0 ? '#10b981' : '#f43f5e' },
     { name: 'Costo cauciones', valor: parseFloat((-totalCostoCauciones).toFixed(2)), color: '#f43f5e' },
@@ -78,13 +84,11 @@ export default function ResumenTab({ cauciones, cedears }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
-      {/* Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
         {card('P&L no realizado', fmtUSD(pnlNoRealizado), `${abiertas.length} posiciones abiertas`, pnlNoRealizado >= 0 ? 'var(--green)' : 'var(--red)')}
         {card('P&L realizado', fmtUSD(pnlRealizado), `${cerradas.length} posiciones cerradas`, pnlRealizado >= 0 ? 'var(--green)' : 'var(--red)')}
         {card('P&L total', fmtUSD(pnlTotal), fmtPct(totalInvertido > 0 ? (pnlTotal / totalInvertido) * 100 : 0), pnlTotal >= 0 ? 'var(--green)' : 'var(--red)')}
-        {card('Costo cauciones', fmtUSD(totalCostoCauciones), `${cauciones.length} cauciones activas`, 'var(--red)')}
+        {card('Costo cauciones', fmtUSD(totalCostoCauciones), `${cauciones.length} cauciones`, 'var(--red)')}
         {card('Rendimiento neto', fmtUSD(rendimientoNeto), fmtPct(rendimientoNetoPct), rendimientoNeto >= 0 ? 'var(--green)' : 'var(--red)')}
       </div>
 
@@ -98,10 +102,9 @@ export default function ResumenTab({ cauciones, cedears }: Props) {
 
       {abiertas.length > 0 && (
         <>
-          {/* Gráfico 1: P&L individual */}
           {chartBox(
             'P&L por CEDEAR (USD)',
-            'Ganancia o pérdida de cada posición abierta en dólares, independientemente del costo de financiamiento.',
+            'Ganancia o pérdida de cada posición abierta, independientemente del costo de financiamiento.',
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={pnlData} margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
                 {grid}{xAxis}{yAxis}
@@ -114,10 +117,9 @@ export default function ResumenTab({ cauciones, cedears }: Props) {
             </ResponsiveContainer>
           )}
 
-          {/* Gráfico 2: Comparación total cartera */}
           {chartBox(
             'Resultado total de la estrategia (USD)',
-            'P&L total de CEDEARs vs costo total de cauciones. La barra "Rend. neto" es lo que efectivamente ganás.',
+            'P&L total de CEDEARs vs costo total acumulado de cauciones. La barra "Rend. neto" es lo que efectivamente ganás.',
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={totalData} margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
                 {grid}{xAxis}{yAxis}
