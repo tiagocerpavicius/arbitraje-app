@@ -37,14 +37,23 @@ export default function CedearsTab({ cedears, addCedear, updateCedear, deleteCed
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.ticker || !form.cantidad || !form.precioCompra || !form.precioActual) return;
-    addCedear({ ticker: form.ticker.toUpperCase(), cantidad: Number(form.cantidad), precioCompra: Number(form.precioCompra), precioActual: Number(form.precioActual) });
+    addCedear({
+      ticker: form.ticker.toUpperCase(),
+      cantidad: Number(form.cantidad),
+      precioCompra: Number(form.precioCompra),
+      precioActual: Number(form.precioActual),
+    });
     setForm(EMPTY);
   };
 
   const startEdit = (c: Cedear) => { setEditing(c.id); setEditPrecio(String(c.precioActual)); setSelling(null); };
   const confirmEdit = (id: string) => { updateCedear(id, { precioActual: Number(editPrecio) }); setEditing(null); };
   const startSell = (c: Cedear) => { setSelling(c.id); setSellData({ precio: String(c.precioActual), fecha: new Date().toISOString().split('T')[0] }); setEditing(null); };
-  const confirmSell = (id: string) => { if (!sellData.precio) return; updateCedear(id, { precioVenta: Number(sellData.precio), fechaVenta: sellData.fecha }); setSelling(null); };
+  const confirmSell = (id: string) => {
+    if (!sellData.precio) return;
+    updateCedear(id, { precioVenta: Number(sellData.precio), fechaVenta: sellData.fecha });
+    setSelling(null);
+  };
 
   const abiertas = cedears.filter((c) => !c.precioVenta);
   const cerradas = cedears.filter((c) => c.precioVenta !== undefined);
@@ -72,7 +81,12 @@ export default function CedearsTab({ cedears, addCedear, updateCedear, deleteCed
 
       {/* Formulario */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
-        <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--muted2)', textTransform: 'uppercase', marginBottom: '16px' }}>Nueva Posición CEDEAR</div>
+        <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--muted2)', textTransform: 'uppercase', marginBottom: '4px' }}>
+          Nueva Compra CEDEAR
+        </div>
+        <div style={{ fontSize: '11px', color: 'var(--muted2)', marginBottom: '16px' }}>
+          Si el ticker ya existe, se suma a la posición existente con precio promedio ponderado.
+        </div>
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', marginBottom: '12px' }}>
             <div>{lbl('Ticker')}<input className="input-dark font-mono-data" type="text" placeholder="AAPL" value={form.ticker} onChange={(e) => set('ticker', e.target.value.toUpperCase())} required /></div>
@@ -81,7 +95,7 @@ export default function CedearsTab({ cedears, addCedear, updateCedear, deleteCed
             <div>{lbl('Precio actual (USD)')}<input className="input-dark font-mono-data" type="number" step="0.0001" placeholder="19.20" value={form.precioActual} onChange={(e) => set('precioActual', e.target.value)} required /></div>
           </div>
           <button type="submit" style={{ width: '100%', background: 'var(--violet)', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: 700, fontFamily: 'Syne, sans-serif', cursor: 'pointer' }}>
-            + Agregar CEDEAR
+            + Agregar / Sumar a posición
           </button>
         </form>
       </div>
@@ -111,7 +125,7 @@ export default function CedearsTab({ cedears, addCedear, updateCedear, deleteCed
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  {th('Ticker', 'left')}{th('Cant.')}{th('P. compra')}{th('P. actual')}{th('Invertido')}{th('Valor actual')}{th('P&L USD')}{th('P&L %')}{th('')}
+                  {th('Ticker', 'left')}{th('Cant.')}{th('P. prom.')}{th('P. actual')}{th('Invertido')}{th('Valor actual')}{th('P&L USD')}{th('P&L %')}{th('')}
                 </tr>
               </thead>
               <tbody>
@@ -127,7 +141,7 @@ export default function CedearsTab({ cedears, addCedear, updateCedear, deleteCed
                       <td style={{ padding: '12px 14px' }}>
                         <span className="font-mono-data" style={{ fontWeight: 700, color: 'var(--violet)', fontSize: '14px' }}>{c.ticker}</span>
                       </td>
-                      <td className="font-mono-data" style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--muted2)' }}>{fmtNum(c.cantidad, 0)}</td>
+                      <td className="font-mono-data" style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--muted2)' }}>{fmtNum(c.cantidad, 2)}</td>
                       <td className="font-mono-data" style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--muted2)' }}>{fmtUSD(c.precioCompra, 4)}</td>
                       <td style={{ padding: '12px 14px', textAlign: 'right' }}>
                         {isEditing
@@ -177,7 +191,7 @@ export default function CedearsTab({ cedears, addCedear, updateCedear, deleteCed
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  {th('Ticker', 'left')}{th('Cant.')}{th('P. compra')}{th('P. venta')}{th('P&L realizado')}{th('P&L %')}{th('Fecha venta')}{th('')}
+                  {th('Ticker', 'left')}{th('Cant.')}{th('P. prom.')}{th('P. venta')}{th('P&L realizado')}{th('P&L %')}{th('Fecha venta')}{th('')}
                 </tr>
               </thead>
               <tbody>
@@ -191,7 +205,7 @@ export default function CedearsTab({ cedears, addCedear, updateCedear, deleteCed
                       <td style={{ padding: '12px 14px' }}>
                         <span className="font-mono-data" style={{ fontWeight: 700, color: 'var(--muted2)', fontSize: '14px' }}>{c.ticker}</span>
                       </td>
-                      <td className="font-mono-data" style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--muted2)' }}>{fmtNum(c.cantidad, 0)}</td>
+                      <td className="font-mono-data" style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--muted2)' }}>{fmtNum(c.cantidad, 2)}</td>
                       <td className="font-mono-data" style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--muted2)' }}>{fmtUSD(c.precioCompra, 4)}</td>
                       <td className="font-mono-data" style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--text)' }}>{fmtUSD(c.precioVenta!, 4)}</td>
                       <td className="font-mono-data" style={{ padding: '12px 14px', textAlign: 'right', color: pnl >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 700 }}>{fmtUSD(pnl)}</td>
