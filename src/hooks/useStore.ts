@@ -92,37 +92,24 @@ export function useStore(userId: string) {
   ) => {
     const caucion = cauciones.find((c) => c.id === id);
     if (!caucion) return;
-
-    // Guardar período actual en historial
     const periodoId = genId();
     const interesesPeriodo = calcInteresPeriodo(caucion.monto, caucion.tna, caucion.plazo);
     await supabase.from('caucion_periodos').insert({
-      id: periodoId,
-      caucion_id: id,
-      user_id: userId,
-      monto: caucion.monto,
-      tna: caucion.tna,
-      plazo: caucion.plazo,
-      fecha_inicio: caucion.fechaInicio,
-      intereses: interesesPeriodo,
+      id: periodoId, caucion_id: id, user_id: userId,
+      monto: caucion.monto, tna: caucion.tna, plazo: caucion.plazo,
+      fecha_inicio: caucion.fechaInicio, intereses: interesesPeriodo,
     });
-
-    // Actualizar caución con nuevos términos
     const { data: row } = await supabase.from('cauciones').update({
-      monto: params.monto,
-      tna: params.tna,
-      plazo: params.plazo,
-      fecha_inicio: params.fechaInicio,
+      monto: params.monto, tna: params.tna,
+      plazo: params.plazo, fecha_inicio: params.fechaInicio,
       renovaciones: caucion.renovaciones + 1,
     }).eq('id', id).select().single();
-
     if (row) {
       setCauciones((p) => p.map((c) => (c.id === id ? rowToCaucion(row) : c)));
       const nuevoPeriodo: CaucionPeriodo = {
-        id: periodoId, caucionId: id,
-        monto: caucion.monto, tna: caucion.tna,
-        plazo: caucion.plazo, fechaInicio: caucion.fechaInicio,
-        intereses: interesesPeriodo,
+        id: periodoId, caucionId: id, monto: caucion.monto,
+        tna: caucion.tna, plazo: caucion.plazo,
+        fechaInicio: caucion.fechaInicio, intereses: interesesPeriodo,
       };
       setPeriodos((p) => ({ ...p, [id]: [...(p[id] ?? []), nuevoPeriodo] }));
     }
@@ -135,14 +122,42 @@ export function useStore(userId: string) {
   }, [userId]);
 
   const addCedear = useCallback(async (data: Omit<Cedear, 'id'>) => {
-    const id = genId();
-    const { data: row } = await supabase.from('cedears').insert({
-      id, user_id: userId, ticker: data.ticker,
-      cantidad: data.cantidad, precio_compra: data.precioCompra,
-      precio_actual: data.precioActual,
-    }).select().single();
-    if (row) setCedears((p) => [...p, rowToCedear(row)]);
-  }, [userId]);
+    // Buscar posición abierta existente con el mismo ticker
+    const existing = cedears.find(
+      (c) => c.ticker === data.ticker && !c.precioVenta
+    );
+
+    if (existing) {
+      // Calcular precio promedio ponderado
+      const totalCantidad = existing.cantidad + data.cantidad;
+      const precioPromedio =
+        (existing.cantidad * existing.precioCompra + data.cantidad * data.precioCompra) /
+        totalCantidad;
+
+      await supabase.from('cedears').update({
+        cantidad: totalCantidad,
+        precio_compra: precioPromedio,
+        precio_actual: data.precioActual,
+      }).eq('id', existing.id).eq('user_id', userId);
+
+      setCedears((p) =>
+        p.map((c) =>
+          c.id === existing.id
+            ? { ...c, cantidad: totalCantidad, precioCompra: precioPromedio, precioActual: data.precioActual }
+            : c
+        )
+      );
+    } else {
+      // Crear nueva posición
+      const id = genId();
+      const { data: row } = await supabase.from('cedears').insert({
+        id, user_id: userId, ticker: data.ticker,
+        cantidad: data.cantidad, precio_compra: data.precioCompra,
+        precio_actual: data.precioActual,
+      }).select().single();
+      if (row) setCedears((p) => [...p, rowToCedear(row)]);
+    }
+  }, [userId, cedears]);
 
   const updateCedear = useCallback(async (id: string, data: Partial<Omit<Cedear, 'id'>>) => {
     const updates: Record<string, unknown> = {};
