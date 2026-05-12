@@ -71,7 +71,7 @@ export default function CedearsTab({ cedears, addCedear, updateCedear, deleteCed
     setRefreshing(true);
     setRefreshMsg('');
     try {
-      const tickers = [...new Set(abiertas.map((c) => c.ticker))].join(',');
+      const tickers = Array.from(new Set(abiertas.map((c) => c.ticker))).join(',');
       const res = await fetch(`/api/quotes?tickers=${tickers}`);
       const prices: Record<string, number> = await res.json();
 
