@@ -1,8 +1,11 @@
 'use client';
 import { useState } from 'react';
-import { Trash2, Pencil, Check, X, TrendingDown } from 'lucide-react';
+import { Trash2, Pencil, Check, X, TrendingDown, RefreshCw } from 'lucide-react';
 import { Cedear } from '@/lib/types';
-import { calcPnL, calcPnLPct, calcValorActual, calcValorInvertido, fmtUSD, fmtPct, fmtNum } from '@/lib/calculations';
+import {
+  calcPnL, calcPnLPct, calcValorActual, calcValorInvertido,
+  fmtUSD, fmtPct, fmtNum,
+} from '@/lib/calculations';
 
 interface Props {
   cedears: Cedear[];
@@ -14,15 +17,21 @@ interface Props {
 const EMPTY = { ticker: '', cantidad: '', precioCompra: '', precioActual: '' };
 
 const lbl = (text: string) => (
-  <label style={{ display: 'block', fontSize: '10px', color: 'var(--muted2)', marginBottom: '5px', fontFamily: 'Syne, sans-serif', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const }}>{text}</label>
+  <label style={{ display: 'block', fontSize: '10px', color: 'var(--muted2)', marginBottom: '5px', fontFamily: 'Syne, sans-serif', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const }}>
+    {text}
+  </label>
 );
 
 const th = (text: string, align: 'left' | 'right' = 'right') => (
-  <th key={text} style={{ padding: '10px 14px', textAlign: align, fontSize: '10px', fontWeight: 700, fontFamily: 'Syne, sans-serif', letterSpacing: '0.08em', color: 'var(--muted2)', textTransform: 'uppercase', whiteSpace: 'nowrap' as const }}>{text}</th>
+  <th key={text} style={{ padding: '10px 14px', textAlign: align, fontSize: '10px', fontWeight: 700, fontFamily: 'Syne, sans-serif', letterSpacing: '0.08em', color: 'var(--muted2)', textTransform: 'uppercase', whiteSpace: 'nowrap' as const }}>
+    {text}
+  </th>
 );
 
 const secTitle = (text: string) => (
-  <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--muted2)', textTransform: 'uppercase', marginBottom: '12px' }}>{text}</div>
+  <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--muted2)', textTransform: 'uppercase', marginBottom: '12px' }}>
+    {text}
+  </div>
 );
 
 export default function CedearsTab({ cedears, addCedear, updateCedear, deleteCedear }: Props) {
@@ -31,6 +40,8 @@ export default function CedearsTab({ cedears, addCedear, updateCedear, deleteCed
   const [editPrecio, setEditPrecio] = useState('');
   const [selling, setSelling] = useState<string | null>(null);
   const [sellData, setSellData] = useState({ precio: '', fecha: new Date().toISOString().split('T')[0] });
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshMsg, setRefreshMsg] = useState('');
 
   const set = (k: keyof typeof EMPTY, v: string) => setForm((p) => ({ ...p, [k]: v }));
 
@@ -55,6 +66,35 @@ export default function CedearsTab({ cedears, addCedear, updateCedear, deleteCed
     setSelling(null);
   };
 
+  const handleRefresh = async () => {
+    if (!abiertas.length || refreshing) return;
+    setRefreshing(true);
+    setRefreshMsg('');
+    try {
+      const tickers = [...new Set(abiertas.map((c) => c.ticker))].join(',');
+      const res = await fetch(`/api/quotes?tickers=${tickers}`);
+      const prices: Record<string, number> = await res.json();
+
+      let updated = 0;
+      for (const c of abiertas) {
+        if (prices[c.ticker] && prices[c.ticker] !== c.precioActual) {
+          await updateCedear(c.id, { precioActual: prices[c.ticker] });
+          updated++;
+        }
+      }
+      setRefreshMsg(
+        updated > 0
+          ? `✓ ${updated} posición${updated > 1 ? 'es' : ''} actualizada${updated > 1 ? 's' : ''}`
+          : '✓ Precios ya estaban al día'
+      );
+    } catch {
+      setRefreshMsg('✗ Error al obtener cotizaciones');
+    } finally {
+      setRefreshing(false);
+      setTimeout(() => setRefreshMsg(''), 4000);
+    }
+  };
+
   const abiertas = cedears.filter((c) => !c.precioVenta);
   const cerradas = cedears.filter((c) => c.precioVenta !== undefined);
 
@@ -69,7 +109,8 @@ export default function CedearsTab({ cedears, addCedear, updateCedear, deleteCed
   );
 
   const iconBtn = (onClick: () => void, icon: React.ReactNode, hoverColor: string) => (
-    <button onClick={onClick} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '3px', display: 'flex', alignItems: 'center' }}
+    <button onClick={onClick}
+      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '3px', display: 'flex', alignItems: 'center' }}
       onMouseOver={(e) => (e.currentTarget.style.color = hoverColor)}
       onMouseOut={(e) => (e.currentTarget.style.color = 'var(--muted)')}>
       {icon}
@@ -85,16 +126,17 @@ export default function CedearsTab({ cedears, addCedear, updateCedear, deleteCed
           Nueva Compra CEDEAR
         </div>
         <div style={{ fontSize: '11px', color: 'var(--muted2)', marginBottom: '16px' }}>
-          Si el ticker ya existe, se suma a la posición existente con precio promedio ponderado.
+          Usá el ticker del segmento D (ej: METAD, AAPLD). Si ya existe, suma con precio promedio ponderado.
         </div>
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', marginBottom: '12px' }}>
-            <div>{lbl('Ticker')}<input className="input-dark font-mono-data" type="text" placeholder="AAPL" value={form.ticker} onChange={(e) => set('ticker', e.target.value.toUpperCase())} required /></div>
+            <div>{lbl('Ticker')}<input className="input-dark font-mono-data" type="text" placeholder="METAD" value={form.ticker} onChange={(e) => set('ticker', e.target.value.toUpperCase())} required /></div>
             <div>{lbl('Cantidad')}<input className="input-dark font-mono-data" type="number" step="0.01" placeholder="100" value={form.cantidad} onChange={(e) => set('cantidad', e.target.value)} required /></div>
             <div>{lbl('Precio compra (USD)')}<input className="input-dark font-mono-data" type="number" step="0.0001" placeholder="18.50" value={form.precioCompra} onChange={(e) => set('precioCompra', e.target.value)} required /></div>
             <div>{lbl('Precio actual (USD)')}<input className="input-dark font-mono-data" type="number" step="0.0001" placeholder="19.20" value={form.precioActual} onChange={(e) => set('precioActual', e.target.value)} required /></div>
           </div>
-          <button type="submit" style={{ width: '100%', background: 'var(--violet)', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: 700, fontFamily: 'Syne, sans-serif', cursor: 'pointer' }}>
+          <button type="submit"
+            style={{ width: '100%', background: 'var(--violet)', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: 700, fontFamily: 'Syne, sans-serif', cursor: 'pointer' }}>
             + Agregar / Sumar a posición
           </button>
         </form>
@@ -120,7 +162,38 @@ export default function CedearsTab({ cedears, addCedear, updateCedear, deleteCed
       {/* Posiciones abiertas */}
       {abiertas.length > 0 && (
         <div>
-          {secTitle('Posiciones abiertas')}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            {secTitle('Posiciones abiertas')}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {refreshMsg && (
+                <span style={{
+                  fontSize: '11px',
+                  fontFamily: 'DM Mono, monospace',
+                  color: refreshMsg.startsWith('✓') ? 'var(--green)' : 'var(--red)',
+                }}>
+                  {refreshMsg}
+                </span>
+              )}
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: '8px', padding: '6px 14px', cursor: refreshing ? 'not-allowed' : 'pointer',
+                  color: refreshing ? 'var(--muted)' : 'var(--text)',
+                  fontSize: '12px', fontFamily: 'Syne, sans-serif', fontWeight: 700,
+                  opacity: refreshing ? 0.6 : 1, transition: 'all 0.15s',
+                }}
+                onMouseOver={(e) => { if (!refreshing) e.currentTarget.style.borderColor = 'var(--violet)'; }}
+                onMouseOut={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+              >
+                <RefreshCw size={13} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
+                {refreshing ? 'Actualizando...' : 'Actualizar cotizaciones'}
+              </button>
+            </div>
+          </div>
+
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
@@ -228,6 +301,13 @@ export default function CedearsTab({ cedears, addCedear, updateCedear, deleteCed
           No hay CEDEARs registrados. Agregá uno arriba.
         </div>
       )}
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
