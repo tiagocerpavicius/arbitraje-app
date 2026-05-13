@@ -5,33 +5,37 @@ export async function GET(request: NextRequest) {
   const tickers = searchParams.get('tickers')?.split(',').filter(Boolean) ?? [];
 
   if (!tickers.length) {
-    return NextResponse.json({ error: 'sin tickers' });
+    return NextResponse.json({});
   }
 
-  const ticker = tickers[0];
+  const prices: Record<string, number> = {};
 
-  try {
-    const res = await fetch(
-      `https://yahoo-finance166.p.rapidapi.com/api/stock/get-price?region=AR&symbol=${ticker}.BA`,
-      {
-        headers: {
-          'x-rapidapi-host': 'yahoo-finance166.p.rapidapi.com',
-          'x-rapidapi-key': process.env.RAPIDAPI_KEY ?? 'SIN_KEY',
-          'Content-Type': 'application/json',
-        },
+  await Promise.all(
+    tickers.map(async (ticker) => {
+      try {
+        const res = await fetch(
+          `https://yahoo-finance166.p.rapidapi.com/api/stock/get-price?region=AR&symbol=${ticker}.BA`,
+          {
+            headers: {
+              'x-rapidapi-host': 'yahoo-finance166.p.rapidapi.com',
+              'x-rapidapi-key': process.env.RAPIDAPI_KEY!,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        const data = await res.json();
+        const price =
+          data?.quoteSummary?.result?.[0]?.price?.regularMarketPrice?.raw;
+
+        if (price && typeof price === 'number') {
+          prices[ticker] = price;
+        }
+      } catch {
+        // ticker no encontrado, se ignora
       }
-    );
+    })
+  );
 
-    const status = res.status;
-    const data = await res.json();
-
-    return NextResponse.json({
-      ticker: `${ticker}.BA`,
-      tieneKey: !!process.env.RAPIDAPI_KEY,
-      status,
-      data,
-    });
-  } catch (err) {
-    return NextResponse.json({ error: String(err) });
-  }
+  return NextResponse.json(prices);
 }
