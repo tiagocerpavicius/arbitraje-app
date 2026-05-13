@@ -8,36 +8,56 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({});
   }
 
-  const prices: Record<string, number> = {};
-
-  await Promise.all(
-    tickers.map(async (ticker) => {
-      try {
-        const symbol = `${ticker}.BA`;
-        const res = await fetch(
-          `https://query2.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`,
-          {
-            headers: {
-              'User-Agent':
-                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              Accept: 'application/json',
-              'Accept-Language': 'en-US,en;q=0.9',
-              Referer: 'https://finance.yahoo.com/',
-            },
-          }
-        );
-
-        const data = await res.json();
-        const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-
-        if (price && typeof price === 'number') {
-          prices[ticker] = price;
-        }
-      } catch {
-        // ticker no encontrado, se ignora
+  try {
+    const res = await fetch(
+      'https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free/cedears',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          limit: 200,
+          excludeZeroPx: false,
+          excludeNoRem: false,
+          T2: true,
+          T1: false,
+          T0: false,
+        }),
       }
-    })
-  );
+    );
 
-  return NextResponse.json(prices);
+    const data = await res.json();
+    const list: Record<string, unknown>[] = Array.isArray(data)
+      ? data
+      : (data?.data ?? data?.content ?? []);
+
+    const prices: Record<string, number> = {};
+
+    for (const ticker of tickers) {
+      const item = list.find(
+        (i) =>
+          i['symbol'] === ticker ||
+          i['Simbolo'] === ticker ||
+          i['symbolWithSuffix'] === ticker ||
+          i['ticker'] === ticker
+      );
+      if (item) {
+        const price =
+          (item['price'] as number) ||
+          (item['ultimoPrecio'] as number) ||
+          (item['c'] as number) ||
+          (item['trade'] as number);
+        if (price) prices[ticker] = price;
+      }
+    }
+
+    return NextResponse.json(prices);
+  } catch {
+    return NextResponse.json(
+      { error: 'Error al obtener cotizaciones' },
+      { status: 500 }
+    );
+  }
 }
